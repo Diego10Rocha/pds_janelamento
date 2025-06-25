@@ -12,41 +12,40 @@ def design_filter():
     try:
         # Obter especificações
         fs = float(filter_parameters.fs_var.get())
-        fp = float(filter_parameters.fp_var.get())
+        fpassband1 = float(filter_parameters.fpassband1_var.get())
+        fpassband2 = float(filter_parameters.fpassband2_var.get())
         transition_width = float(filter_parameters.transition_width_var.get())
         stopband_atten = float(filter_parameters.stopband_atten_var.get())
         filter_type = filter_parameters.filter_type_var.get()
         window_name = filter_parameters.selected_window_var.get()
+
+        fc1, fc2 = 100, 1000  # Inicializar frequências de corte
         
         # Validações
-        if fp >= fs/2:
-            raise ValueError("Frequência da banda passante deve ser menor que Fs/2")
+        # if fpassband1 >= fs/2:
+        #     raise ValueError("Frequência da banda passante deve ser menor que Fs/2")
         
         # Calcular frequência de corte baseada no tipo de filtro
         if filter_type == "Passa-Baixa":
-            fs_freq = fp + transition_width  # Frequência de stopband
-            fc1 = (fp + fs_freq) / 2  # Frequência de corte centrada na transição
+            fs_freq = fpassband1 + transition_width  # Frequência de stopband
+            fc1 = fpassband1  # Frequência de corte centrada na transição
         elif filter_type == "Passa-Alta":  # Passa-Alta
-            fs_freq = fp - transition_width  # Frequência de stopband
-            fc1 = (fs_freq + fp) / 2  # Frequência de corte centrada na transição
-            
+            fs_freq = fpassband1 - transition_width  # Frequência de stopband
+            fc1 = fpassband1 / 2  # Frequência de corte
             if fs_freq <= 0:
                 raise ValueError("Para passa-alta: fp - largura_transição deve ser > 0")
         elif filter_type == "Passa-Banda":
-            f1 = fp / 2
-            f2 = fp + transition_width / 2
-            if f1 <= 0 or f2 >= fs / 2:
+            fc1 = fpassband1
+            fc2 = fpassband2
+            if fc1 <= 0 or fc2 >= fs / 2:
                 raise ValueError("Frequências do passa-banda devem estar no intervalo válido.")
-            fc1 = f1 / (fs / 2)
-            fc2 = f2 / (fs / 2)
-
+            # fc1 = f1 / (fs / 2)
+            # fc2 = f2 / (fs / 2)
         elif filter_type == "Rejeita-Banda":
-            f1 = fp / 2
-            f2 = fp + transition_width / 2
-            if f1 <= 0 or f2 >= fs / 2:
-                raise ValueError("Frequências do rejeita-banda devem estar no intervalo válido.")
-            fc1 = f1 / (fs / 2)
-            fc2 = f2 / (fs / 2)
+            # if f1 <= 0 or f2 >= fs / 2:
+            #     raise ValueError("Frequências do rejeita-banda devem estar no intervalo válido.")
+            fc1 = fpassband1 / 2
+            fc2 = fpassband2 / 2
         else:
             raise ValueError("Tipo de filtro desconhecido.")
         
@@ -74,9 +73,13 @@ def design_filter():
         # Limitar ordem
         order = max(11, min(501, order))
         
-        # Projetar filtro ideal
+        # Projetar filtro ideal normalizado em termos de Nyquist para garantir que ele foi aplicado 
+        # corretamente e que não haverá aliasing ou distorção de fase
         nyquist = fs / 2
-        #fc_norm = fc1 / nyquist
+        fc1 = fc1 / nyquist
+        fc2 = fc2 / nyquist if filter_type in ["Passa-Banda", "Rejeita-Banda"] else None
+        
+        # Calcular resposta ideal do filtro
         
         if filter_type == "Passa-Baixa":
             h_ideal = ideal_lowpass(order, fc1)
@@ -93,8 +96,6 @@ def design_filter():
         if 'Kaiser' in window_name:
             beta = window_params['beta']
             window = signal.get_window(('kaiser', beta), order)
-        elif window_name == 'Retangular':
-            window = signal.get_window('boxcar', order)
         elif window_name == 'Bartlett':
             window = signal.get_window('bartlett', order)
         elif window_name == 'Hanning':
@@ -129,6 +130,7 @@ def design_filter():
     except Exception as e:
         messagebox.showerror("Erro", f"Erro no projeto: {e}")
 
+#O filtro é centrado em M/2 para simetria tornando o filtro causal
 def ideal_lowpass(N, fc_norm):
     """Calcula filtro passa-baixa ideal"""
     M = N - 1
@@ -146,6 +148,7 @@ def ideal_lowpass(N, fc_norm):
     
     return h
 
+#O filtro é centrado em M/2 para simetria tornando o filtro causal
 def ideal_highpass(N, fc_norm):
     """Calcula filtro passa-alta ideal"""
     M = N - 1
@@ -160,12 +163,13 @@ def ideal_highpass(N, fc_norm):
         else:
             # Impulso delta menos passa-baixa
             delta_impulse = np.sin(np.pi * n_centered) / (np.pi * n_centered)
-            omega_c = fc_norm * np.pi
-            lowpass_term = 2 * fc_norm * np.sin(omega_c * n_centered) / (omega_c * n_centered)
+            sinc_arg = 2 * fc_norm * n_centered
+            lowpass_term = 2 * fc_norm * np.sin(np.pi * sinc_arg) / (np.pi * sinc_arg)
             h[i] = delta_impulse - lowpass_term
     
     return h
 
+#O filtro é centrado em M/2 para simetria tornando o filtro causal
 def ideal_bandpass(N, fc1, fc2):
     """Calcula filtro passa-banda ideal"""
     M = N - 1
@@ -177,10 +181,14 @@ def ideal_bandpass(N, fc1, fc2):
         if abs(n_centered) < 1e-10:
             h[i] = 2 * (fc2 - fc1)
         else:
-            h[i] = (np.sin(2 * np.pi * fc2 * n_centered) - np.sin(2 * np.pi * fc1 * n_centered)) / (np.pi * n_centered)
+            omega_c1 = fc1 * np.pi
+            omega_c2 = fc2 * np.pi
+            h[i] = (2 * fc2 * np.sin(omega_c2 * n_centered) / (omega_c2 * n_centered) - 
+                    2 * fc1 * np.sin(omega_c1 * n_centered) / (omega_c1 * n_centered))
 
     return h
 
+#O filtro é centrado em M/2 para simetria tornando o filtro causal
 def ideal_bandstop(N, fc1, fc2):
     """Calcula filtro rejeita-banda ideal"""
     M = N - 1

@@ -24,7 +24,8 @@ class FilterDesignApp:
         
         # Configuração de estilo
         self.style = ttk.Style()
-        self.style.theme_use("default")
+        self.style.theme_use("clam")
+        self.configure_style()
         
         # Janelas disponíveis (será filtrada baseada na atenuação)
         self.available_windows = []
@@ -93,7 +94,16 @@ class FilterDesignApp:
             row=row, column=0, sticky=tk.W, pady=5)
         fp_frame = ttk.Frame(parent)
         fp_frame.grid(row=row, column=1, sticky=tk.W+tk.E, pady=5, padx=(10,0))
-        ttk.Entry(fp_frame, textvariable=self.filter_parameters.fp_var, width=10).pack(side=tk.LEFT)
+        ttk.Entry(fp_frame, textvariable=self.filter_parameters.fpassband1_var, width=10).pack(side=tk.LEFT)
+        ttk.Label(fp_frame, text="Hz").pack(side=tk.LEFT, padx=(5, 0))
+        row += 1
+
+        # Frequência da borda da banda passante
+        ttk.Label(parent, text="Frequência da Borda da\nBanda Passante(Passa-Banda):", font=('Arial', 10)).grid(
+            row=row, column=0, sticky=tk.W, pady=5)
+        fp_frame = ttk.Frame(parent)
+        fp_frame.grid(row=row, column=1, sticky=tk.W+tk.E, pady=5, padx=(10,0))
+        ttk.Entry(fp_frame, textvariable=self.filter_parameters.fpassband2_var, width=10).pack(side=tk.LEFT)
         ttk.Label(fp_frame, text="Hz").pack(side=tk.LEFT, padx=(5, 0))
         row += 1
         
@@ -336,7 +346,7 @@ conforme verificado na resposta em frequência.
         """Atualiza todos os gráficos"""
         self.plot_window(window)
         self.plot_coefficients(h_windowed, h_ideal)
-        self.plot_frequency_response(h_windowed, fs, fc2, fc2)
+        self.plot_frequency_response(h_windowed, fs, fc1, fc2)
     
     def plot_window(self, window):
         """Plota a função de janelamento"""
@@ -439,23 +449,49 @@ conforme verificado na resposta em frequência.
         
         # Adicionar linhas de referência
         try:
-            fp = float(self.fp_var.get())
+            fpassband1 = float(self.filter_parameters.fpassband1_var.get())
+            fpassband2 = float(self.filter_parameters.fpassband2_var.get())
             transition_width = float(self.filter_parameters.transition_width_var.get())
             stopband_atten = float(self.filter_parameters.stopband_atten_var.get())
             filter_type = self.filter_parameters.filter_type_var.get()
             
             if filter_type == "Passa-Baixa":
-                fs_freq = fp + transition_width
-                ax1.axvline(fp, color='g', linestyle='--', alpha=0.8, 
-                           label=f'fp = {fp:.0f} Hz')
+                fs_freq = fpassband1 + transition_width
+                ax1.axvline(fpassband1, color='g', linestyle='--', alpha=0.8, 
+                           label=f'fp = {fpassband1:.0f} Hz')
                 ax1.axvline(fs_freq, color='r', linestyle='--', alpha=0.8, 
                            label=f'fs = {fs_freq:.0f} Hz')
-            else:  # Passa-Alta
-                fs_freq = fp - transition_width
+            elif filter_type == "Passa-Alta":  # Passa-Alta
+                fs_freq = fpassband1 - transition_width
                 ax1.axvline(fs_freq, color='r', linestyle='--', alpha=0.8, 
                            label=f'fs = {fs_freq:.0f} Hz')
-                ax1.axvline(fp, color='g', linestyle='--', alpha=0.8, 
-                           label=f'fp = {fp:.0f} Hz')
+                ax1.axvline(fpassband1, color='g', linestyle='--', alpha=0.8, 
+                           label=f'fp = {fpassband1:.0f} Hz')
+            elif filter_type == "Passa-Banda":  # Passa-Banda
+                fs_freq = fpassband1 - transition_width
+                ax1.axvline(fs_freq, color='r', linestyle='--', alpha=0.8, 
+                           label=f'fs = {fs_freq:.0f} Hz')
+                ax1.axvline(fpassband1, color='g', linestyle='--', alpha=0.8, 
+                           label=f'fp1 = {fpassband1:.0f} Hz')
+                
+                fs_freq = fpassband2 + transition_width
+                ax1.axvline(fs_freq, color='r', linestyle='--', alpha=0.8, 
+                           label=f'fs = {fs_freq:.0f} Hz')
+                ax1.axvline(fpassband2, color='g', linestyle='--', alpha=0.8, 
+                           label=f'fp2 = {fpassband2:.0f} Hz')
+            else:  # Rejeita-Banda
+                fs_freq = fpassband1 + transition_width
+                ax1.axvline(fs_freq, color='r', linestyle='--', alpha=0.8, 
+                           label=f'fs = {fs_freq:.0f} Hz')
+                ax1.axvline(fpassband1, color='g', linestyle='--', alpha=0.8, 
+                           label=f'fp1 = {fpassband1:.0f} Hz')
+                
+                fs_freq = fpassband2 - transition_width
+                ax1.axvline(fs_freq, color='r', linestyle='--', alpha=0.8, 
+                           label=f'fs = {fs_freq:.0f} Hz')
+                ax1.axvline(fpassband2, color='g', linestyle='--', alpha=0.8, 
+                           label=f'2 = {fpassband2:.0f} Hz')
+
             
             ax1.axvline(fc1, color='orange', linestyle=':', alpha=0.8, 
                        label=f'fc = {fc1:.0f} Hz')
@@ -490,3 +526,38 @@ conforme verificado na resposta em frequência.
         
         self.freq_fig.tight_layout()
         self.freq_canvas.draw()
+
+    
+    def configure_style(self):
+        self.style.configure("TFrame", background="#DB8686")
+        self.style.configure("TButton",
+                     font=("Arial", 10, "bold"),
+                     padding=6,
+                     background="#4CAF50",
+                     foreground="white")
+        self.style.configure("TLabelframe",
+                     background="#4CAF50",
+                     borderwidth=2)
+
+# Modal de seleção da janela
+class WindowFunctionModal(tk.Toplevel):
+    def __init__(self, parent, callback):
+        super().__init__(parent)
+        self.title("Selecionar função de janelamento")
+        self.grab_set()  # Torna modal
+        self.resizable(False, False)
+        self.callback = callback
+
+        ttk.Label(self, text="Escolha a função de janelamento:").pack(padx=20, pady=10)
+
+        self.window_var = tk.StringVar(value="Hamming")
+
+        options = ["Hamming", "Hanning", "Blackman", "Kaiser"]
+        self.dropdown = ttk.OptionMenu(self, self.window_var, options[0], *options)
+        self.dropdown.pack(pady=10)
+
+        ttk.Button(self, text="OK", command=self.on_ok).pack(pady=10)
+
+    def on_ok(self):
+        self.callback(self.window_var.get())
+        self.destroy()

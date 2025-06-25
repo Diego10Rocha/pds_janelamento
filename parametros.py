@@ -6,13 +6,6 @@ class Filter:
     filter_parameters = None
     def __init__(self):
         self.window_parameters = {
-                'Retangular': {
-                    'largura_transicao_normalizada': 0.9,
-                    'ondulacao_banda_passante_db': 0.7416,
-                    'lobulo_principal_lateral_db': 13,
-                    'atenuacao_banda_rejeicao_db': 21,
-                    'expressao': "w(n) = 1"
-                },
                 'Bartlett': {
                     'largura_transicao_normalizada': 2.3,
                     'ondulacao_banda_passante_db': 0.185,
@@ -48,22 +41,6 @@ class Filter:
                     'atenuacao_banda_rejeicao_db': 50,
                     'beta': 4.54,
                     'expressao': "I₀(β√(1-(2n/(N-1))²))/I₀(β)"
-                },
-                'Kaiser_beta_6.76': {
-                    'largura_transicao_normalizada': 4.32,
-                    'ondulacao_banda_passante_db': 0.00275,
-                    'lobulo_principal_lateral_db': None,
-                    'atenuacao_banda_rejeicao_db': 70,
-                    'beta': 6.76,
-                    'expressao': "I₀(β√(1-(2n/(N-1))²))/I₀(β)"
-                },
-                'Kaiser_beta_8.96': {
-                    'largura_transicao_normalizada': 5.71,
-                    'ondulacao_banda_passante_db': 0.000275,
-                    'lobulo_principal_lateral_db': None,
-                    'atenuacao_banda_rejeicao_db': 90,
-                    'beta': 8.96,
-                    'expressao': "I₀(β√(1-(2n/(N-1))²))/I₀(β)"
                 }
             }
         
@@ -72,7 +49,8 @@ class Filter:
         # Variáveis de controle
         self.filter_type_var = tk.StringVar(value="Passa-Baixa")
         self.fs_var = tk.StringVar(value="8000")  # Frequência de amostragem
-        self.fp_var = tk.StringVar(value="1500")  # Frequência da borda da banda passante
+        self.fpassband1_var = tk.StringVar(value="1500")  # Frequência da borda da banda passante
+        self.fpassband2_var = tk.StringVar(value="2500")  # Frequência da borda da banda passante
         self.transition_width_var = tk.StringVar(value="500")  # Largura de transição
         self.stopband_atten_var = tk.StringVar(value="50")  # Atenuação na banda de rejeição
 
