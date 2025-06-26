@@ -20,32 +20,52 @@ def design_filter():
         window_name = filter_parameters.selected_window_var.get()
 
         fc1, fc2 = 100, 1000  # Inicializar frequências de corte
-        
-        # Validações
-        # if fpassband1 >= fs/2:
-        #     raise ValueError("Frequência da banda passante deve ser menor que Fs/2")
-        
+
         # Calcular frequência de corte baseada no tipo de filtro
         if filter_type == "Passa-Baixa":
-            fs_freq = fpassband1 + transition_width  # Frequência de stopband
-            fc1 = fpassband1  # Frequência de corte centrada na transição
+            fstopband = fpassband1 + transition_width  # Frequência de stopband
+            fc1 = (fpassband1 + fstopband) / 2  # Frequência de corte centrada na transição
         elif filter_type == "Passa-Alta":  # Passa-Alta
-            fs_freq = fpassband1 - transition_width  # Frequência de stopband
-            fc1 = fpassband1 / 2  # Frequência de corte
-            if fs_freq <= 0:
+            fstopband = fpassband1 - transition_width  # Frequência de stopband
+            fc1 = (fpassband1 + fstopband) / 2  # Frequência de corte
+            if fstopband <= 0:
                 raise ValueError("Para passa-alta: fp - largura_transição deve ser > 0")
         elif filter_type == "Passa-Banda":
-            fc1 = fpassband1
-            fc2 = fpassband2
-            if fc1 <= 0 or fc2 >= fs / 2:
-                raise ValueError("Frequências do passa-banda devem estar no intervalo válido.")
-            # fc1 = f1 / (fs / 2)
-            # fc2 = f2 / (fs / 2)
+            if fpassband1 >= fpassband2:
+                raise ValueError("Frequência inferior deve ser menor que a superior")
+            if fpassband2 >= fs/2:
+                raise ValueError("Frequência superior deve ser menor que Fs/2")
+            if fpassband1 <= 0:
+                raise ValueError("Frequência inferior deve ser positiva")
+            
+            fstopband = fpassband1 - transition_width  # Frequência de stopband inferior
+            fstopband2 = fpassband2 + transition_width # Frequência de stopband superior
+            fc1 = (fpassband1 + fstopband) / 2  # Frequência de corte inferior
+            fc2 = (fpassband2 + fstopband2) / 2  # Frequência de corte superior
+
+            # Verificar se as frequências de corte estão dentro do intervalo válido
+            if fpassband1 <= 0:
+                raise ValueError("Para passa-banda: fp1 - largura_transição deve ser > 0")
+            if fpassband2 >= fs/2:
+                raise ValueError("Para passa-banda: fp2 + largura_transição deve ser < Fs/2")
+
         elif filter_type == "Rejeita-Banda":
-            # if f1 <= 0 or f2 >= fs / 2:
-            #     raise ValueError("Frequências do rejeita-banda devem estar no intervalo válido.")
-            fc1 = fpassband1 / 2
-            fc2 = fpassband2 / 2
+            if fpassband1 >= fpassband2:
+                raise ValueError("Frequência inferior deve ser menor que a superior")
+            if fpassband2 >= fs/2:
+                raise ValueError("Frequência superior deve ser menor que Fs/2")
+            if fpassband1 <= 0:
+                raise ValueError("Frequência inferior deve ser positiva")
+                
+            fstopband = fpassband1 + transition_width
+            fstopband2 = fpassband2 - transition_width
+            if fstopband <= 0:
+                raise ValueError("Para rejeita-banda: fp1 - largura_transição deve ser > 0")
+            if fpassband2 >= fs/2:
+                raise ValueError("Para rejeita-banda: fp2 + largura_transição deve ser < Fs/2")
+                
+            fc1 = (fstopband + fpassband1) / 2
+            fc2 = (fstopband2 + fpassband2) / 2
         else:
             raise ValueError("Tipo de filtro desconhecido.")
         
@@ -95,15 +115,15 @@ def design_filter():
         # Criar janela
         if 'Kaiser' in window_name:
             beta = window_params['beta']
-            window = signal.get_window(('kaiser', beta), order)
+            window = signal.get_window(('kaiser', beta), order, fftbins=False)
         elif window_name == 'Bartlett':
-            window = signal.get_window('bartlett', order)
+            window = signal.get_window('bartlett', order, fftbins=False)
         elif window_name == 'Hanning':
-            window = signal.get_window('hann', order)
+            window = signal.get_window('hann', order, fftbins=False)
         elif window_name == 'Hamming':
-            window = signal.get_window('hamming', order)
+            window = signal.get_window('hamming', order, fftbins=False)
         elif window_name == 'Blackman':
-            window = signal.get_window('blackman', order)
+            window = signal.get_window('blackman', order, fftbins=False)
         
         # Aplicar janelamento
         h_windowed = h_ideal * window
@@ -159,13 +179,13 @@ def ideal_highpass(N, fc_norm):
         n_centered = n[i] - M/2
         
         if abs(n_centered) < 1e-10:
-            h[i] = 1.0 - 2 * fc_norm
+            h[i] = 1.0 - fc_norm
         else:
             # Impulso delta menos passa-baixa
             delta_impulse = np.sin(np.pi * n_centered) / (np.pi * n_centered)
-            sinc_arg = 2 * fc_norm * n_centered
-            lowpass_term = 2 * fc_norm * np.sin(np.pi * sinc_arg) / (np.pi * sinc_arg)
-            h[i] = delta_impulse - lowpass_term
+            sinc_arg = fc_norm * n_centered
+            lowpass = fc_norm * np.sin(np.pi * sinc_arg) / (np.pi * sinc_arg)
+            h[i] = delta_impulse - lowpass
     
     return h
 
@@ -196,12 +216,15 @@ def ideal_bandstop(N, fc1, fc2):
     h = np.zeros(N)
 
     for i in range(N):
-        n_centered = n[i] - M / 2
-        if abs(n_centered) < 1e-10:
-            h[i] = 1 - 2 * (fc2 - fc1)
-        else:
-            pass_all = np.sin(np.pi * n_centered) / (np.pi * n_centered)
-            stop_band = (np.sin(2 * np.pi * fc2 * n_centered) - np.sin(2 * np.pi * fc1 * n_centered)) / (np.pi * n_centered)
-            h[i] = pass_all - stop_band
+            n_centered = n[i] - M / 2
+            
+            if abs(n_centered) < 1e-10:
+                h[i] = 1 - (fc2 - fc1)
+            else:
+                
+                pass_all = np.sin(np.pi * n_centered) / (np.pi * n_centered)
+                stop_band = (np.sin(np.pi * fc2 * n_centered) - 
+                           np.sin(np.pi * fc1 * n_centered)) / (np.pi * n_centered)
+                h[i] = pass_all - stop_band
 
     return h

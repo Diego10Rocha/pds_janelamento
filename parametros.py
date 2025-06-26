@@ -51,7 +51,7 @@ class Filter:
         self.fs_var = tk.StringVar(value="8000")  # Frequência de amostragem
         self.fpassband1_var = tk.StringVar(value="1500")  # Frequência da borda da banda passante
         self.fpassband2_var = tk.StringVar(value="2500")  # Frequência da borda da banda passante
-        self.transition_width_var = tk.StringVar(value="500")  # Largura de transição
+        self.transition_width_var = tk.StringVar(value="400")  # Largura de transição
         self.stopband_atten_var = tk.StringVar(value="50")  # Atenuação na banda de rejeição
 
         # Resultados
@@ -61,7 +61,7 @@ class Filter:
         self.ideal_response = None
         
         # Variável para janela selecionada
-        self.selected_window_var = tk.StringVar()
+        self.selected_window_var = tk.StringVar(value="Blackman")
 
     @staticmethod
     def get_instance():
