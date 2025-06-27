@@ -74,9 +74,18 @@ def design_filter():
         window_params = filter_parameters.window_parameters[window_name]
         
         
-        A = stopband_atten
-        M = (A - 8) / (2.285 * 2 * np.pi * delta_f_norm)
-        order = int(np.ceil(M))
+        # Usar fator da janela para calcular ordem
+        if 'Kaiser' in window_name:
+            # Para Kaiser, usar fórmula específica
+            A = stopband_atten
+            beta = window_params['beta']
+            M = (A - 8) / (2.285 * 2 * np.pi * delta_f_norm)
+            order = int(np.ceil(M))
+        else:
+            # Para outras janelas, usar fator de largura de transição
+            factor = window_params['largura_transicao_normalizada']
+            N_calc = factor / delta_f_norm
+            order = int(np.ceil(N_calc))
         
         # Garantir ordem ímpar para simetria
         if order % 2 == 0:
