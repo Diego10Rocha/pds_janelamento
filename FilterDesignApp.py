@@ -5,8 +5,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import tkinter as tk
 from tkinter import ttk, messagebox
 from scipy import signal
+from tkinter import filedialog
 
-# Assuming these are in your project structure
 from parametros import Filter
 from calculos import design_filter
 
@@ -33,9 +33,7 @@ class FilterDesignApp:
 
         self.create_interface()
         self.check_available_windows()  # Inicializa com as janelas disponíveis
-        # Bind the filter type change to update_frequency_inputs
         self.filter_parameters.filter_type_var.trace_add("write", self.update_frequency_inputs)
-        # Call it once to set initial state
         self.update_frequency_inputs()
 
 
@@ -59,7 +57,7 @@ class FilterDesignApp:
 
     def create_input_section(self, parent):
         """Cria a seção de entrada de dados"""
-        self.input_parent_frame = parent # Store parent to redraw
+        self.input_parent_frame = parent
         row = 0
 
         # Título
@@ -96,13 +94,10 @@ class FilterDesignApp:
         ttk.Entry(fs_frame, textvariable=self.filter_parameters.fs_var, width=10).pack(anchor=tk.W)
         row += 1
 
-        # Placeholder for frequency inputs (will be updated dynamically)
         self.frequency_inputs_frame = ttk.Frame(parent)
         self.frequency_inputs_frame.grid(row=row, column=0, columnspan=2, sticky="ew")
         row += 1
 
-        # Store a reference to the main widgets that come after the dynamic section
-        # This makes it easier to re-grid them later.
         self.label_transition_width = ttk.Label(parent, text="Largura de Transição(Hz):", font=('Arial', 10))
         self.tw_frame = ttk.Frame(parent)
         self.transition_width_entry = ttk.Entry(self.tw_frame, textvariable=self.filter_parameters.transition_width_var, width=10)
@@ -124,19 +119,22 @@ class FilterDesignApp:
         self.calc_button = ttk.Button(parent, text="PROJETAR FILTRO",
                                        command=self.on_press_button_calculate,
                                        state=tk.NORMAL)
-
-        # self.results_frame = ttk.LabelFrame(parent, text="Informações Calculadas", padding=10)
-        # self.results_text = tk.Text(self.results_frame, height=15, width=50, wrap=tk.WORD,
-        #                              font=('Consolas', 9))
-        # scrollbar_results = ttk.Scrollbar(self.results_frame, orient="vertical",
-        #                                   command=self.results_text.yview)
-        # self.results_text.configure(yscrollcommand=scrollbar_results.set)
-        # self.results_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        # scrollbar_results.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # Configurar expansão (this might need dynamic adjustment if layout changes significantly)
-        #parent.grid_rowconfigure(row, weight=1) # This is for the frequency_inputs_frame
-        #parent.grid_columnconfigure(1, weight=1)
+        
+        self.export_frame = ttk.LabelFrame(parent, text="  Exportar Coeficientes  ", padding=10)
+        
+        
+        
+        ttk.Label(self.export_frame, text="Salvar coeficientes calculados em arquivo:",
+                 font=('Arial', 9)).pack(anchor=tk.W, pady=(0, 8))
+        # Frame para botões de exportação
+        export_buttons_frame = ttk.Frame(self.export_frame)
+        export_buttons_frame.pack(fill=tk.X)
+        
+        self.export_button = ttk.Button(export_buttons_frame, text="EXPORTAR TXT",
+                                       command=self.export_coefficients,
+                                       state=tk.DISABLED,
+                                       style="Action.TButton")
+        self.export_button.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
 
     def on_attenuation_change(self, *args):
         """Callback para quando o valor da atenuação é modificado."""
@@ -150,12 +148,11 @@ class FilterDesignApp:
 
     def update_frequency_inputs(self, *args):
         """Updates the frequency input fields based on the selected filter type."""
-        # Clear existing widgets in the frequency inputs frame
         for widget in self.frequency_inputs_frame.winfo_children():
             widget.destroy()
 
         filter_type = self.filter_parameters.filter_type_var.get()
-        current_row_in_frame = 0 # Use a local row counter for this sub-frame
+        current_row_in_frame = 0
 
         if filter_type in ["Passa-Baixa", "Passa-Alta", "Rejeita-Banda"]:
             label_text = "Frequência da Borda da Banda Passante(Hz):"
@@ -194,8 +191,6 @@ class FilterDesignApp:
             ttk.Entry(entry_frame, textvariable=self.filter_parameters.fpassband2_var, width=10).pack(anchor=tk.W)
             current_row_in_frame += 1
 
-        # Re-grid the subsequent elements
-        # First, ungrid them from their previous positions
         self.label_transition_width.grid_forget()
         self.tw_frame.grid_forget()
         self.label_stopband_atten.grid_forget()
@@ -203,13 +198,9 @@ class FilterDesignApp:
         self.check_button.grid_forget()
         self.window_frame.grid_forget()
         self.calc_button.grid_forget()
-        #self.results_frame.grid_forget()
 
-        # Now, calculate the new starting row for the elements that follow
-        # The row of frequency_inputs_frame + the number of rows it now occupies
         new_start_row = self.frequency_inputs_frame.grid_info()['row'] + self.frequency_inputs_frame.grid_size()[1]
 
-        # Re-grid the elements at their new positions
         self.label_transition_width.grid(row=new_start_row, column=0, sticky=tk.W, pady=5)
         self.tw_frame.grid(row=new_start_row, column=1, sticky=tk.W+tk.E, pady=5, padx=(10,0))
         new_start_row += 1
@@ -227,9 +218,9 @@ class FilterDesignApp:
         self.calc_button.grid(row=new_start_row, column=0, columnspan=2, pady=20)
         new_start_row += 1
 
-        # self.results_frame.grid(row=new_start_row, column=0, columnspan=2, sticky="nsew", pady=10)
+        self.export_frame.grid(row=new_start_row, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+        new_start_row += 1
 
-        # Ensure the parent frame updates its layout
         self.input_parent_frame.update_idletasks()
 
     def create_visualization_section(self, parent):
@@ -315,9 +306,7 @@ class FilterDesignApp:
                 if params.get('lobulo_principal_lateral_db'):
                     info_text += f"• Lóbulo Principal vs Lateral: {params['lobulo_principal_lateral_db']} dB\n"
                 info_text += f"• Expressão: {params['expressao']}\n"
-            print(info_text)  # For debugging purposes
-            # self.results_text.delete(1.0, tk.END)
-            # self.results_text.insert(tk.END, info_text)
+            print(info_text)
 
         except ValueError:
             messagebox.showerror("Erro", "Digite um valor válido para a atenuação.")
@@ -329,6 +318,9 @@ class FilterDesignApp:
 
     def on_press_button_calculate(self):
         (h_windowed, window, h_ideal, fs, fc1, fc2) = design_filter()
+        
+        # Armazenar resultados
+        self.current_results = h_windowed
         nyquist_freq = fs / 2
         fc1 = fc1 * nyquist_freq #Revertendo a normalização
         fc2 = fc2 * nyquist_freq if fc2 is not None else None
@@ -355,6 +347,8 @@ class FilterDesignApp:
             )
         except Exception as e:
             messagebox.showerror("Erro de Cálculo", f"Ocorreu um erro ao mostrar os cálculos: {e}")
+        # Habilitar botões de exportação
+        self.export_button.config(state=tk.NORMAL)
 
 
     def show_calculations(self, fs, fp, transition_width, stopband_atten,
@@ -368,7 +362,6 @@ ESPECIFICAÇÕES FORNECIDAS:
 • Tipo de Filtro: {filter_type}
 • Frequência de Amostragem: {fs:.0f} Hz
 """
-        # Adapt frequency display based on filter type
         if filter_type in ["Passa-Baixa", "Passa-Alta"]:
             calculations += f"• Frequência da Borda da Banda Passante: {fp:.0f} Hz\n"
         elif filter_type == "Passa-Banda":
@@ -444,13 +437,6 @@ h({i}) = {h_windowed[i]:.8f} (centro)"""
                 calculations += f"""
 h({i}) = {h_windowed[i]:.8f}"""
 
-#         if len(h_windowed) > 6:
-#             calculations += f"""
-# ...
-# h({center}) = {h_windowed[center]:.8f} (centro)
-# ...
-# h({len(h_windowed)-1}) = {h_windowed[-1]:.8f}"""
-
         calculations += f"""
 
 PROPRIEDADES DA JANELA {window_name.upper()}:
@@ -469,9 +455,7 @@ O filtro resultante deve atender às especificações de desempenho
 conforme verificado na resposta em frequência.
 """
 
-        #self.results_text.delete(1.0, tk.END)
-        #self.results_text.insert(tk.END, calculations)
-        print(calculations)  # For debugging purposes
+        print(calculations)
 
     def update_all_plots(self, h_windowed, window, h_ideal, fs, fc1, fc2):
         """Atualiza todos os gráficos"""
@@ -581,7 +565,7 @@ conforme verificado na resposta em frequência.
         # Adicionar linhas de referência
         try:
             fpassband1 = float(self.filter_parameters.fpassband1_var.get())
-            # Safely get fpassband2, it might not be set for some filter types
+            
             fpassband2 = None
             if self.filter_parameters.filter_type_var.get() in ["Passa-Banda", "Rejeita-Banda"]:
                 fpassband2 = float(self.filter_parameters.fpassband2_var.get())
@@ -636,7 +620,7 @@ conforme verificado na resposta em frequência.
             ax1.axhline(-3, color='purple', linestyle=':', alpha=0.7, label='-3 dB')
 
         except Exception as e:
-            # print(f"Error drawing frequency response lines: {e}")
+            print(f"Error drawing frequency response lines: {e}")
             pass
 
         ax1.legend(fontsize=9)
@@ -695,3 +679,43 @@ conforme verificado na resposta em frequência.
         self.style.map("TNotebook.Tab",
                        background=[('selected', '#4CAF50')],
                        foreground=[('selected', 'white')])
+
+    def export_coefficients(self):
+        """Exporta os coeficientes do filtro para arquivo txt simples"""
+        if self.current_results is None:
+            messagebox.showwarning("Aviso", "Nenhum filtro foi projetado ainda.")
+            return
+        
+        try:
+            
+            # Obter coeficientes
+            coefficients = self.current_results
+            
+            # Diálogo para salvar arquivo
+            filename = filedialog.asksaveasfilename(
+                title="Salvar Coeficientes do Filtro",
+                defaultextension=".txt",
+                filetypes=[
+                    ("Arquivo de texto", "*.txt"),
+                    ("Todos os arquivos", "*.*")
+                ]
+            )
+            
+            if not filename:
+                return
+            
+            # Escrever arquivo
+            with open(filename, 'w', encoding='utf-8') as f:
+            
+                f.write("h = [")
+                for i, coef in enumerate(coefficients):
+                    if i == 0:
+                        f.write(f"{coef:.10f}")
+                    else:
+                        f.write(f", {coef:.10f}")
+                f.write("];\n")
+            
+            messagebox.showinfo("Sucesso", f"Coeficientes salvos com sucesso!\nArquivo: {filename}")
+            
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao salvar arquivo: {e}")
