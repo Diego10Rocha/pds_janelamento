@@ -110,8 +110,8 @@ class FilterDesignApp:
         
         self.filter_parameters.stopband_atten_var.trace_add('write', self.on_attenuation_change)
 
-        self.check_button = ttk.Button(parent, text="Verificar Janelas Disponíveis",
-                                  command=self.check_available_windows)
+        # self.check_button = ttk.Button(parent, text="Verificar Janelas Disponíveis",
+        #                           command=self.check_available_windows)
 
         self.window_frame = ttk.LabelFrame(parent, text="Funções de Janelamento Disponíveis",
                                              padding=10)
@@ -195,7 +195,7 @@ class FilterDesignApp:
         self.tw_frame.grid_forget()
         self.label_stopband_atten.grid_forget()
         self.atten_frame.grid_forget()
-        self.check_button.grid_forget()
+        #self.check_button.grid_forget()
         self.window_frame.grid_forget()
         self.calc_button.grid_forget()
 
@@ -209,8 +209,8 @@ class FilterDesignApp:
         self.atten_frame.grid(row=new_start_row, column=1, sticky=tk.W+tk.E, pady=5, padx=(10,0))
         new_start_row += 1
 
-        self.check_button.grid(row=new_start_row, column=0, columnspan=2, pady=20)
-        new_start_row += 1
+        # self.check_button.grid(row=new_start_row, column=0, columnspan=2, pady=20)
+        # new_start_row += 1
 
         self.window_frame.grid(row=new_start_row, column=0, columnspan=2, sticky="ew", pady=10)
         new_start_row += 1
